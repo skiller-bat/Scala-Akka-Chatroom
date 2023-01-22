@@ -32,5 +32,6 @@ class ChatRoomActor extends Actor with ActorLogging {
       clients.values
         .filter(client => client != sender())
         .foreach(client => client forward Message(msg.text))
+      sender() ! ResponseMessage(msg)
   }
 }

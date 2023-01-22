@@ -1,7 +1,7 @@
 package com.chat
 
 import akka.actor.Status.{Failure, Success}
-import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
+import akka.actor.{Actor, ActorLogging, ActorSystem, Cancellable, Props}
 import akka.pattern.ask
 import akka.util.Timeout
 import Status.{NOT_OK, OK}
@@ -56,7 +56,7 @@ class UserActor extends Actor with ActorLogging {
   implicit val system: ActorSystem = context.system
   private val server = context.actorSelection("akka://ChatRoom-System@127.0.0.1:25520/user/ChatRoom")
   private var input = Actor.noSender
-  private var messages: List[Message] = List()
+  private var outgoing = scala.collection.mutable.Map[Message, Option[Cancellable]]()
 
 
   def expectRegistration: Receive = {
@@ -64,9 +64,6 @@ class UserActor extends Actor with ActorLogging {
       server ! msg
       input = sender()
       context.become(awaitRegistrationConformation)
-
-    case _ =>
-      log.warning("NOOO")
   }
 
   def awaitRegistrationConformation: Receive = {
@@ -78,18 +75,28 @@ class UserActor extends Actor with ActorLogging {
         case NOT_OK =>
           context.become(expectRegistration)
       }
-
-    case _ =>
-      log.warning("NOOO")
   }
 
   def registered: Receive = {
 
     case InputMessage(msg) =>
-      server ! Message(msg)
+      val m = Message(msg)
+      server ! m
+
+      import system.dispatcher
+      val c = system.scheduler.scheduleOnce(3.seconds, self, Retry(m))
+      outgoing += (m -> Option(c))
+
+    case ResponseMessage(msg) =>
+      outgoing(msg).get.cancel()
+      outgoing(msg) = None
+
+    case Retry(msg) =>
+      server ! msg
+      outgoing(msg) = None
 
     case Message(msg) =>
-      log.info(msg.toString)
+      log.info(msg)
   }
 
   override def receive: Receive = expectRegistration
