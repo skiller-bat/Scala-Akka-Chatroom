@@ -1,7 +1,8 @@
-package com.chat
+package com.chat.client
 
 import akka.actor.{Actor, ActorLogging, ActorSystem}
-import Status.{NOT_OK, OK}
+import com.chat.msg.{InputMessage, RegisterUser, ResponseRegisterUser}
+import com.chat.msg.Status.{NOT_OK, OK}
 
 import scala.io.StdIn.readLine
 

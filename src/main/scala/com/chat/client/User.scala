@@ -1,18 +1,23 @@
-package com.chat
+package com.chat.client
 
 import akka.actor.Status.{Failure, Success}
 import akka.actor.{Actor, ActorLogging, ActorSystem, Cancellable, Props}
 import akka.pattern.ask
 import akka.util.Timeout
-import Status.{NOT_OK, OK}
+import com.chat.msg.Status.{NOT_OK, OK}
+import com.chat.*
+import com.chat.msg.{InputMessage, Message, MessageACK, MessageRead, RegisterUser, ResponseMessage, ResponseRegisterUser, Retry}
 import com.typesafe.config.ConfigFactory
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.*
+import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 import scala.io.StdIn.readLine
 import scala.util.control.Breaks.{break, breakable}
+import scala.collection.mutable.ListBuffer
 
 object User {
+
+  implicit val timeout: Timeout = Timeout(1.seconds)
 
   def main(args: Array[String]): Unit = {
 
@@ -23,21 +28,23 @@ object User {
     val system = ActorSystem("User-System", complete)
 
     val client = system.actorOf(Props[UserActor](), "User")
-//    val input = system.actorOf(Props[ConsoleActor](), "Input")
+    //    val input = system.actorOf(Props[ConsoleActor](), "Input")
 
     /* Register User */
-    implicit val timeout: Timeout = Timeout(1.seconds)
+
     var username = readLine("Username: ")
-    breakable { while (true) {
-      val res = client ? RegisterUser(username)
-      Await.result(res, 1.second) match {
-        case ResponseRegisterUser(status) =>
-          status match {
-            case OK => break
-            case NOT_OK => username = readLine("Username already assigned! Enter a different one: ")
-          }
+    breakable {
+      while (true) {
+        val res = client ? RegisterUser(username)
+        Await.result(res, 1.second) match {
+          case ResponseRegisterUser(status) =>
+            status match {
+              case OK => break
+              case NOT_OK => username = readLine("Username already assigned! Enter a different one: ")
+            }
+        }
       }
-    }}
+    }
 
     /* Communicate */
     var message = readLine("Message: ")
@@ -54,10 +61,13 @@ object User {
 class UserActor extends Actor with ActorLogging {
 
   implicit val system: ActorSystem = context.system
+  implicit val dispatcher: ExecutionContextExecutor = context.dispatcher
   private val server = context.actorSelection("akka://ChatRoom-System@127.0.0.1:25520/user/ChatRoom")
   private var input = Actor.noSender
   private var outgoing = scala.collection.mutable.Map[Message, Option[Cancellable]]()
+  private var unreadMessages = ListBuffer[Message]()
 
+  override def receive: Receive = expectRegistration
 
   def expectRegistration: Receive = {
     case msg: RegisterUser =>
@@ -80,12 +90,12 @@ class UserActor extends Actor with ActorLogging {
   def registered: Receive = {
 
     case InputMessage(msg) =>
-      val m = Message(msg)
-      server ! m
-
-      import system.dispatcher
-      val c = system.scheduler.scheduleOnce(3.seconds, self, Retry(m))
-      outgoing += (m -> Option(c))
+      val message = Message(msg)
+      server ! message
+      unreadMessages += message
+      //unreadMessages = message :: unreadMessages
+      val c = system.scheduler.scheduleOnce(3.seconds, self, Retry(message))
+      outgoing += (message -> Option(c))
 
     case ResponseMessage(msg) =>
       outgoing(msg).get.cancel()
@@ -95,9 +105,14 @@ class UserActor extends Actor with ActorLogging {
       server ! msg
       outgoing(msg) = None
 
-    case Message(msg) =>
-      log.info(msg)
-  }
+    case msg: Message =>
+      log.info(msg.text)
+      sender() ! MessageACK(msg)
 
-  override def receive: Receive = expectRegistration
+    case MessageRead(_, message) =>
+      log.info(s"Message $message has been read by everyone")
+      unreadMessages -= message
+
+
+  }
 }
