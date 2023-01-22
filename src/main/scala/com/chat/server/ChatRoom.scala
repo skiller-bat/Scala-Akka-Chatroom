@@ -1,7 +1,7 @@
 package com.chat.server
 
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, PoisonPill, Props}
-import com.chat.msg.{Message, MessageACK, MessageRead, RegisterUser, ResponseMessage, ResponseRegisterUser}
+import com.chat.msg.{Message, MessageACK, MessageRead, RegisterUser, ResponseMessage, ResponseRegisterUser, UserDeregister}
 import com.chat.msg.Status.{NOT_OK, OK}
 
 import scala.::
@@ -31,12 +31,16 @@ class ChatRoomActor extends Actor with ActorLogging {
         sender() ! ResponseRegisterUser(NOT_OK)
       }
 
+    case UserDeregister(name) => 
+      onlineUsers = onlineUsers.filter(user => user.path.name == name)
+      outgoingMessages.foreach((_, tracker) => tracker ! UserDeregister(name))
+      
     case msg: Message => // dont destruct and construct!
+      sender() ! ResponseMessage(msg)
       log.info("Client " + sender() + " says: " + msg.text)
       val otherUsers = onlineUsers.filter(client => client != sender())
       val msgTracker = context.actorOf(Props(new MessageTrackerActor(msg, sender(), otherUsers)))
       outgoingMessages += (msg -> msgTracker)
-      sender() ! ResponseMessage(msg)
 
     case readMessage: MessageRead =>
       log.info(s"Message ${readMessage.message} read by all users")
@@ -51,6 +55,7 @@ class MessageTrackerActor(message: Message, originalSender: ActorRef, var otherU
   override def preStart(): Unit = {
     super.preStart()
     log.info(s"Started Message Tracker actor for msg $message")
+    if(otherUsers.isEmpty) context.parent ! MessageRead(originalSender, message)
     otherUsers.foreach(client => client ! message)
   }
 
@@ -58,5 +63,9 @@ class MessageTrackerActor(message: Message, originalSender: ActorRef, var otherU
     case MessageACK(msg) =>
       if (message == msg) otherUsers = otherUsers.filter(_ != sender()); log.info(s"Received ACK from ${sender()}")
       if (otherUsers.isEmpty) context.parent ! MessageRead(originalSender, message)
+
+    case UserDeregister(name) =>
+      otherUsers = otherUsers.filter(user => user.path.name != name)
+      if(otherUsers.isEmpty) context.parent ! MessageRead(originalSender, message)
   }
 }

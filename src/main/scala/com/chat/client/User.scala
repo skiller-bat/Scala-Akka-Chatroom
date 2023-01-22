@@ -6,7 +6,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import com.chat.msg.Status.{NOT_OK, OK}
 import com.chat.*
-import com.chat.msg.{InputMessage, Message, MessageACK, MessageRead, RegisterUser, ResponseMessage, ResponseRegisterUser, Retry}
+import com.chat.msg.{InputMessage, Message, MessageACK, MessageRead, RegisterUser, ResponseMessage, ResponseRegisterUser, Retry, UserDeregister}
 import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.duration.*
@@ -66,6 +66,11 @@ class UserActor extends Actor with ActorLogging {
   private var input = Actor.noSender
   private var outgoing = scala.collection.mutable.Map[Message, Option[Cancellable]]()
   private var unreadMessages = ListBuffer[Message]()
+
+  override def postStop(): Unit = {
+    super.postStop()
+    server ! UserDeregister(self.path.name)
+  }
 
   override def receive: Receive = expectRegistration
 
