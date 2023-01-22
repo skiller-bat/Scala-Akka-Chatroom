@@ -13,6 +13,7 @@ object Server {
 
 // Vermittler
 // Telefonbuch
+// Chatroom
 class ServerActor extends Actor with ActorLogging {
 
   implicit val system: ActorSystem = context.system
@@ -33,5 +34,11 @@ class ServerActor extends Actor with ActorLogging {
         sender() ! Connect(clients(name))
       else
         sender() ! NotOk()
+
+    case Message(msg) =>  // dont destruct and construct!
+      log.info("Client " + sender() + " says: " + msg)
+      clients.values
+        .filter(client => client != sender())
+        .foreach(client => client forward Message(msg))
   }
 }

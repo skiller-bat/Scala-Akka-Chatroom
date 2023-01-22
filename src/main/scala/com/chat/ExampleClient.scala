@@ -7,8 +7,6 @@ object Client {
 
   def main(args: Array[String]): Unit = {
 
-//    val system = ActorSystem.create("Client-System") // ?
-
     val myConfig = ConfigFactory.parseString("akka.remote.artery.canonical.port=0")
     val regularConfig = ConfigFactory.load()
     val combined = myConfig.withFallback(regularConfig)
@@ -24,19 +22,18 @@ class ClientActor extends Actor with ActorLogging {
 
   implicit val system: ActorSystem = context.system
   private val server = context.actorSelection("akka://Server-System@127.0.0.1:25520/user/Server")
-
-//  server ! FindUser("Züpfi")
-//  server ! RegisterUser("Züpfi")
-//  server ! FindUser("Züpfi")
-//  server ! RegisterUser("Züpfi")
+  private var messages: List[Message] = List()
 
   override def receive: Receive = {
 
     case Ok() => log.info("OK")
     case NotOk() => log.info("NOT OK")
 
+    case InputMessage(msg) =>
+      server ! Message(msg)
+
     case Message(msg) =>
-      log.info(msg) // TODO
+      log.info(msg)
 
     case Connect(user) =>
       log.info("got user:" + user)
