@@ -1,7 +1,7 @@
 package com.chat
 
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
-import com.chat.Status.{NOT_OK, OK}
+import Status.*
 
 object ChatRoom {
 
@@ -21,16 +21,16 @@ class ChatRoomActor extends Actor with ActorLogging {
 
     case RegisterUser(name) =>
       if (clients contains name) {
-        sender ! ResponseRegisterUser(NOT_OK())
+        sender() ! ResponseRegisterUser(NOT_OK)
       } else {
         clients += (name -> sender())
-        sender ! ResponseRegisterUser(OK())
+        sender() ! ResponseRegisterUser(OK)
       }
 
     case msg: Message =>  // dont destruct and construct!
-      log.info("Client " + sender + " says: " + msg.text)
+      log.info("Client " + sender() + " says: " + msg.text)
       clients.values
-        .filter(client => client != sender)
+        .filter(client => client != sender())
         .foreach(client => client forward Message(msg.text))
   }
 }

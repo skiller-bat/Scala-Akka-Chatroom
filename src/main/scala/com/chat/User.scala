@@ -4,11 +4,11 @@ import akka.actor.Status.{Failure, Success}
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import akka.pattern.ask
 import akka.util.Timeout
-import com.chat.Status.{NOT_OK, OK}
+import Status.{NOT_OK, OK}
 import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.{Await, Future}
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.*
 import scala.io.StdIn.readLine
 import scala.util.control.Breaks.{break, breakable}
 
@@ -26,25 +26,25 @@ object User {
 //    val input = system.actorOf(Props[ConsoleActor](), "Input")
 
     /* Register User */
-    implicit val timeout = Timeout(1.second)
+    implicit val timeout: Timeout = Timeout(1.seconds)
     var username = readLine("Username: ")
     breakable { while (true) {
       val res = client ? RegisterUser(username)
       Await.result(res, 1.second) match {
         case ResponseRegisterUser(status) =>
           status match {
-            case OK() => break
-            case NOT_OK() => username = readLine("Username already assigned! Enter a different one: ")
+            case OK => break
+            case NOT_OK => username = readLine("Username already assigned! Enter a different one: ")
           }
       }
     }}
 
     /* Communicate */
     var message = readLine("Message: ")
-    do {
+    while (message != "") {
       client ! InputMessage(message)
       message = readLine("Message: ")
-    } while (message != "")
+    }
 
     println("Goodbye " + username + "!")
     // TODO: shutdown
@@ -62,7 +62,7 @@ class UserActor extends Actor with ActorLogging {
   def expectRegistration: Receive = {
     case msg: RegisterUser =>
       server ! msg
-      input = sender
+      input = sender()
       context.become(awaitRegistrationConformation)
 
     case _ =>
@@ -73,9 +73,9 @@ class UserActor extends Actor with ActorLogging {
     case msg: ResponseRegisterUser =>
       input ! msg
       msg.status match {
-        case OK() =>
+        case OK =>
           context.become(registered)
-        case NOT_OK() =>
+        case NOT_OK =>
           context.become(expectRegistration)
       }
 
@@ -89,7 +89,7 @@ class UserActor extends Actor with ActorLogging {
       server ! Message(msg)
 
     case Message(msg) =>
-      log.info(msg)
+      log.info(msg.toString)
   }
 
   override def receive: Receive = expectRegistration

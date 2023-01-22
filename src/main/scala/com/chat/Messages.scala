@@ -7,11 +7,11 @@ case class Message(text: String)
 case class InputMessage(text: String)
 
 
-//enum Status:
-//  case OK, NOT_OK
+enum Status:
+  case OK, NOT_OK
 
-sealed abstract class Status
+/*sealed abstract class Status
 object Status {
   final case class OK() extends Status
   final case class NOT_OK() extends Status
-}
+}*/

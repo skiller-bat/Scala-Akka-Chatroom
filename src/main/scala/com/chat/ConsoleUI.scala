@@ -1,7 +1,7 @@
 package com.chat
 
 import akka.actor.{Actor, ActorLogging, ActorSystem}
-import com.chat.Status.{NOT_OK, OK}
+import Status.{NOT_OK, OK}
 
 import scala.io.StdIn.readLine
 
@@ -19,11 +19,11 @@ class ConsoleActor extends Actor with ActorLogging {
   def awaitRegistrationConformation: Receive = {
     case msg: ResponseRegisterUser =>
       msg.status match {
-        case OK() =>
+        case OK =>
           context.become(registered)
           val message = readLine("Message: ")
           client ! InputMessage(message) // TODO
-        case NOT_OK() =>
+        case NOT_OK =>
           clientName = readLine("Username already assigned! Enter a different one: ")
           client ! RegisterUser(clientName)
       }
