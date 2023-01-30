@@ -5,11 +5,9 @@ import akka.actor.ActorRef
 case class RegisterUser(name: String)
 case class ResponseRegisterUser(status: Status)
 
-case class UserDeregister(name: String)
-
-case class Message(text: String)    //Normal chat message
+case class Message(userName: String, text: String)    //Normal chat message
 case class ResponseMessage(msg: Message)  //Chatroom confirms message incoming arrival
-case class InputMessage(text: String) //Used for distinguishing messages from ui and other messages
+case class InputMessage(userName: String, text: String) //Used for distinguishing messages from ui and other messages
 
 case class Retry(msg: Message)  //Retry message if chatroom does not respond
 
