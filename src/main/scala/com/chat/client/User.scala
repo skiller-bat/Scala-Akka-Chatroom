@@ -6,9 +6,10 @@ import akka.pattern.ask
 import akka.util.Timeout
 import com.chat.msg.Status.{NOT_OK, OK}
 import com.chat.*
-import com.chat.msg.{InputMessage, Message, MessageACK, MessageRead, RegisterUser, ResponseMessage, ResponseRegisterUser, Retry, UserDeregister}
+import com.chat.msg.{InputMessage, Message, MessageACK, MessageRead, RegisterUser, ResponseMessage, ResponseRegisterUser, Retry}
 import com.typesafe.config.ConfigFactory
 
+import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 import scala.io.StdIn.readLine
@@ -49,7 +50,7 @@ object User {
     /* Communicate */
     var message = readLine("Message: ")
     while (message != "") {
-      client ! InputMessage(message)
+      client ! InputMessage("", message)
       message = readLine("Message: ")
     }
 
@@ -63,27 +64,22 @@ class UserActor extends Actor with ActorLogging {
   implicit val system: ActorSystem = context.system
   implicit val dispatcher: ExecutionContextExecutor = context.dispatcher
   private val server = context.actorSelection("akka://ChatRoom-System@127.0.0.1:25520/user/ChatRoom")
-  private var input = Actor.noSender
-  private var outgoing = scala.collection.mutable.Map[Message, Option[Cancellable]]()
+  private var ui = Actor.noSender
+  private var outgoing = mutable.Map[Message, Option[Cancellable]]()
   private var unreadMessages = ListBuffer[Message]()
-
-  override def postStop(): Unit = {
-    super.postStop()
-    server ! UserDeregister(self.path.name)
-  }
 
   override def receive: Receive = expectRegistration
 
   def expectRegistration: Receive = {
     case msg: RegisterUser =>
       server ! msg
-      input = sender()
+      ui = sender()
       context.become(awaitRegistrationConformation)
   }
 
   def awaitRegistrationConformation: Receive = {
     case msg: ResponseRegisterUser =>
-      input ! msg
+      ui ! msg
       msg.status match {
         case OK =>
           context.become(registered)
@@ -93,31 +89,31 @@ class UserActor extends Actor with ActorLogging {
   }
 
   def registered: Receive = {
-
-    case InputMessage(msg) =>
-      val message = Message(msg)
+    case inputMessage: InputMessage =>
+      val message = Message(inputMessage.userName, inputMessage.text)
       server ! message
       unreadMessages += message
-      //unreadMessages = message :: unreadMessages
-      val c = system.scheduler.scheduleOnce(3.seconds, self, Retry(message))
-      outgoing += (message -> Option(c))
+      val cancellable = system.scheduler.scheduleOnce(3.seconds, self, Retry(message))
+      outgoing += (message -> Option(cancellable))
+      ui ! inputMessage
 
-    case ResponseMessage(msg) =>
-      outgoing(msg).get.cancel()
-      outgoing(msg) = None
+    case response: ResponseMessage =>
+      outgoing(response.msg).get.cancel()
+      outgoing(response.msg) = None
+      ui ! response
 
-    case Retry(msg) =>
-      server ! msg
-      outgoing(msg) = None
+    case Retry(message) =>
+      server ! message
+      outgoing(message) = None
 
-    case msg: Message =>
-      log.info(msg.text)
-      sender() ! MessageACK(msg)
+    case message: Message =>
+      log.info(message.text)
+      sender() ! MessageACK(message)
+      ui ! message
 
     case MessageRead(_, message) =>
       log.info(s"Message $message has been read by everyone")
       unreadMessages -= message
-
-
+      ui ! MessageRead(self, message)
   }
 }

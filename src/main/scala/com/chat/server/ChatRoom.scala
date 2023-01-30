@@ -1,10 +1,13 @@
 package com.chat.server
 
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, PoisonPill, Props}
-import com.chat.msg.{Message, MessageACK, MessageRead, RegisterUser, ResponseMessage, ResponseRegisterUser, UserDeregister}
+import akka.util.Timeout
+import com.chat.msg.{Message, MessageACK, MessageRead, RegisterUser, ResponseMessage, ResponseRegisterUser}
 import com.chat.msg.Status.{NOT_OK, OK}
 
+import scala.concurrent.duration.*
 import scala.::
+import scala.collection.mutable
 
 object ChatRoom {
 
@@ -18,28 +21,26 @@ object ChatRoom {
 class ChatRoomActor extends Actor with ActorLogging {
 
   implicit val system: ActorSystem = context.system
-  private var onlineUsers: List[ActorRef] = List()
-  private var outgoingMessages: Map[Message, ActorRef] = Map()
+  private var onlineUsers: mutable.Set[ActorRef] = mutable.HashSet()
+  private var outgoingMessages: mutable.Map[Message, ActorRef] = mutable.HashMap()
 
   override def receive: Receive = {
 
     case RegisterUser(name) =>
       if (!onlineUsers.exists(user => user.path.name == name)) {
-        onlineUsers = sender() :: onlineUsers
+        //val userRef = sender()
+        onlineUsers = onlineUsers += sender() //sender() :: onlineUsers
         sender() ! ResponseRegisterUser(OK)
       } else {
         sender() ! ResponseRegisterUser(NOT_OK)
       }
 
-    case UserDeregister(name) => 
-      onlineUsers = onlineUsers.filter(user => user.path.name == name)
-      outgoingMessages.foreach((_, tracker) => tracker ! UserDeregister(name))
-      
     case msg: Message => // dont destruct and construct!
-      sender() ! ResponseMessage(msg)
+      val senderRef = sender()  //sender() is set to ActorRef.noSender in child actor otherwise
+      senderRef ! ResponseMessage(msg)
       log.info("Client " + sender() + " says: " + msg.text)
-      val otherUsers = onlineUsers.filter(client => client != sender())
-      val msgTracker = context.actorOf(Props(new MessageTrackerActor(msg, sender(), otherUsers)))
+      val otherUsers = onlineUsers.filter(client => client != senderRef)
+      val msgTracker = context.actorOf(Props(new MessageTrackerActor(msg, senderRef, otherUsers)))
       outgoingMessages += (msg -> msgTracker)
 
     case readMessage: MessageRead =>
@@ -50,22 +51,19 @@ class ChatRoomActor extends Actor with ActorLogging {
   }
 }
 
-class MessageTrackerActor(message: Message, originalSender: ActorRef, var otherUsers: List[ActorRef]) extends Actor with ActorLogging {
+class MessageTrackerActor(message: Message, originalSender: ActorRef, var otherUsers: mutable.Set[ActorRef]) extends Actor with ActorLogging {
 
   override def preStart(): Unit = {
     super.preStart()
-    log.info(s"Started Message Tracker actor for msg $message")
-    if(otherUsers.isEmpty) context.parent ! MessageRead(originalSender, message)
+    log.info(s"Started Message Tracker actor for msg $message from $originalSender")
+    if (otherUsers.isEmpty) context.parent ! MessageRead(originalSender, message)
     otherUsers.foreach(client => client ! message)
   }
 
   override def receive: Receive = {
     case MessageACK(msg) =>
-      if (message == msg) otherUsers = otherUsers.filter(_ != sender()); log.info(s"Received ACK from ${sender()}")
+      if (message == msg) otherUsers -= sender();
+      log.info(s"Received ACK from ${sender()}")
       if (otherUsers.isEmpty) context.parent ! MessageRead(originalSender, message)
-
-    case UserDeregister(name) =>
-      otherUsers = otherUsers.filter(user => user.path.name != name)
-      if(otherUsers.isEmpty) context.parent ! MessageRead(originalSender, message)
   }
 }

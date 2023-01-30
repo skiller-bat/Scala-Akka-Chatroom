@@ -23,7 +23,7 @@ class ConsoleActor extends Actor with ActorLogging {
         case OK =>
           context.become(registered)
           val message = readLine("Message: ")
-          client ! InputMessage(message) // TODO
+          client ! InputMessage(clientName, message) // TODO
         case NOT_OK =>
           clientName = readLine("Username already assigned! Enter a different one: ")
           client ! RegisterUser(clientName)
