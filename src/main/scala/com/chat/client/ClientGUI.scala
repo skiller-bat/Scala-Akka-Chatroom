@@ -79,7 +79,7 @@ class ClientGUI(config: Config, var userName: String = "") extends JFrame("AkkaC
           case OK =>
           case NOT_OK => dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_CLOSING))
         }
-      case _ => println("Ooops!") // dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_CLOSING))
+      case _ => dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_CLOSING))
     }
   }
 
