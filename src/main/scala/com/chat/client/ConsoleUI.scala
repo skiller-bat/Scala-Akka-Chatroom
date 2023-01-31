@@ -13,7 +13,7 @@ class ConsoleActor extends Actor with ActorLogging {
 
 
   private var clientName = readLine("Username: ")
-  client ! RegisterUser(clientName)
+  client ! RegisterUser()
 
   // TODO: use Futures instead of this Actor
 
@@ -26,7 +26,7 @@ class ConsoleActor extends Actor with ActorLogging {
           client ! InputMessage(clientName, message) // TODO
         case NOT_OK =>
           clientName = readLine("Username already assigned! Enter a different one: ")
-          client ! RegisterUser(clientName)
+          client ! RegisterUser()
       }
 
     case _ =>

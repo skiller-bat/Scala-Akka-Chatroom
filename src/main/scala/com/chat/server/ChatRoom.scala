@@ -21,22 +21,21 @@ object ChatRoom {
 class ChatRoomActor extends Actor with ActorLogging {
 
   implicit val system: ActorSystem = context.system
-  private var onlineUsers: mutable.Set[ActorRef] = mutable.HashSet()
-  private var outgoingMessages: mutable.Map[Message, ActorRef] = mutable.HashMap()
+  private val onlineUsers: mutable.Set[ActorRef] = mutable.HashSet()
+  private val outgoingMessages: mutable.Map[Message, ActorRef] = mutable.HashMap()
 
   override def receive: Receive = {
 
-    case RegisterUser(name) =>
-      if (!onlineUsers.exists(user => user.path.name == name)) {
-        //val userRef = sender()
-        onlineUsers = onlineUsers += sender() //sender() :: onlineUsers
+    case _: RegisterUser =>
+      if (!onlineUsers.contains(sender())) {
+        onlineUsers += sender()
         sender() ! ResponseRegisterUser(OK)
       } else {
         sender() ! ResponseRegisterUser(NOT_OK)
       }
 
     case msg: Message => // dont destruct and construct!
-      val senderRef = sender()  //sender() is set to ActorRef.noSender in child actor otherwise
+      val senderRef = sender() //sender() is set to ActorRef.noSender in child actor otherwise
       senderRef ! ResponseMessage(msg)
       log.info("Client " + sender() + " says: " + msg.text)
       val otherUsers = onlineUsers.filter(client => client != senderRef)
