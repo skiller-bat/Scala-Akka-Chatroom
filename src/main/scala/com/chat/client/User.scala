@@ -36,7 +36,7 @@ object User {
     var username = readLine("Username: ")
     breakable {
       while (true) {
-        val res = client ? RegisterUser(username)
+        val res = client ? RegisterUser()
         Await.result(res, 1.second) match {
           case ResponseRegisterUser(status) =>
             status match {

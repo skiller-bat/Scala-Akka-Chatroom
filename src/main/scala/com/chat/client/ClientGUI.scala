@@ -49,7 +49,7 @@ class ClientGUI(config: Config, var userName: String = "") extends JFrame("AkkaC
     private var ui = ActorRef.noSender
 
     override def receive: Receive = {
-      case msg: RegisterUser => ui = sender(); userActor ! RegisterUser(userName)
+      case msg: RegisterUser => ui = sender(); userActor ! RegisterUser()
       case msg: ResponseRegisterUser => setTitle(s"AkkaChat - $userName | Online"); ui ! msg
       case msg: InputMessage => chatPanel.display.append(s"${msg.userName}: ${msg.text}\n");
       case msg: ResponseMessage => chatPanel.display.append(s"Server received message ${msg.msg}\n")
@@ -72,7 +72,7 @@ class ClientGUI(config: Config, var userName: String = "") extends JFrame("AkkaC
   setVisible(true)
 
   private def registerUser(): Unit = {
-    val response = listenerActor ? RegisterUser(userName)
+    val response = listenerActor ? RegisterUser()
     Await.result(response, timeout.duration) match {
       case ResponseRegisterUser(status) =>
         status match {

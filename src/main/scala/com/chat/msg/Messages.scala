@@ -2,7 +2,7 @@ package com.chat.msg
 
 import akka.actor.ActorRef
 
-case class RegisterUser(name: String)
+case class RegisterUser()
 case class ResponseRegisterUser(status: Status)
 
 case class Message(userName: String, text: String)    //Normal chat message
