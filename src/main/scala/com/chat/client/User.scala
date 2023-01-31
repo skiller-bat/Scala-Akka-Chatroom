@@ -65,8 +65,8 @@ class UserActor extends Actor with ActorLogging {
   implicit val dispatcher: ExecutionContextExecutor = context.dispatcher
   private val server = context.actorSelection("akka://ChatRoom-System@127.0.0.1:25520/user/ChatRoom")
   private var ui = Actor.noSender
-  private var outgoing = mutable.Map[Message, Option[Cancellable]]()
-  private var unreadMessages = ListBuffer[Message]()
+  private val outgoing = mutable.Map[Message, Option[Cancellable]]()
+  private val unreadMessages = ListBuffer[Message]()
 
   override def receive: Receive = expectRegistration
 

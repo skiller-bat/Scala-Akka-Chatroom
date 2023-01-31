@@ -34,13 +34,13 @@ class ChatRoomActor extends Actor with ActorLogging {
         sender() ! ResponseRegisterUser(NOT_OK)
       }
 
-    case msg: Message => // dont destruct and construct!
+    case message: Message => // dont destruct and construct!
       val senderRef = sender() //sender() is set to ActorRef.noSender in child actor otherwise
-      senderRef ! ResponseMessage(msg)
-      log.info("Client " + sender() + " says: " + msg.text)
+      senderRef ! ResponseMessage(message)
+      log.info("Client " + sender() + " says: " + message.text)
       val otherUsers = onlineUsers.filter(client => client != senderRef)
-      val msgTracker = context.actorOf(Props(new MessageTrackerActor(msg, senderRef, otherUsers)))
-      outgoingMessages += (msg -> msgTracker)
+      val msgTracker = context.actorOf(Props(new MessageTrackerActor(message, senderRef, otherUsers)))
+      outgoingMessages += (message -> msgTracker)
 
     case readMessage: MessageRead =>
       log.info(s"Message ${readMessage.message} read by all users")
@@ -50,7 +50,7 @@ class ChatRoomActor extends Actor with ActorLogging {
   }
 }
 
-class MessageTrackerActor(message: Message, originalSender: ActorRef, var otherUsers: mutable.Set[ActorRef]) extends Actor with ActorLogging {
+class MessageTrackerActor(message: Message, originalSender: ActorRef, otherUsers: mutable.Set[ActorRef]) extends Actor with ActorLogging {
 
   override def preStart(): Unit = {
     super.preStart()
