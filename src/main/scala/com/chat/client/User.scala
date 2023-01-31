@@ -98,9 +98,12 @@ class UserActor extends Actor with ActorLogging {
       ui ! inputMessage
 
     case response: ResponseMessage =>
-      outgoing(response.msg).get.cancel()
-      outgoing(response.msg) = None
-      ui ! response
+      outgoing(response.msg) match
+        case Some(cancellable) =>
+          cancellable.cancel()
+          outgoing(response.msg) = None
+          ui ! response
+        case None =>
 
     case Retry(message) =>
       server ! message
